@@ -12,3 +12,4 @@ A simple decentralized application (DApp) built with **React**, **Wagmi**, **Vie
 - ✅ Disable buttons based on contract state (e.g., sold out, insufficient ETH)
 
 ## 🚀 Getting Started
+https://token-vestige.vercel.app/
