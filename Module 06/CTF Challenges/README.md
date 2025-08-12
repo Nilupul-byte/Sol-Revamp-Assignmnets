@@ -7,16 +7,16 @@ Each challenge includes a vulnerable contract, an exploit contract, and a test t
 
 ## 📂 Files Overview
 
-### Challenge 1 – MagicETH
+### Challenge 1 – 1_MagicETH
 - **`Challenge1Test.sol`**  
   Contains the test `Challenge1Test` and the `Exploit` contract that targets `MagicETH`.
-- **`MagicETH.sol`** (in `../src/1_MagicETH/`)  
+- **`MagicETH.sol`** 
   Vulnerable wrapped ETH implementation with a flawed withdrawal mechanism.
 
-### Challenge 2 – ModernWETH
+### Challenge 2 – 2_ModernWETH
 - **`Challenge2Test.sol`**  
   Contains the test `Challenge2Test` and the `Exploit` contract that targets `ModernWETH`.
-- **`ModernWETH.sol`** (in `../src/2_ModernWETH/`)  
+- **`ModernWETH.sol`**  
   Vulnerable wrapped ETH implementation with a broken `withdrawAll` logic.
 
 ---
