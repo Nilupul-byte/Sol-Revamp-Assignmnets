@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
-    // -------------------------------
-    // Structs & Storage
-    // -------------------------------
+    using Address for address payable;
+
     struct Lock {
         uint256 amount;
         address depositor;
@@ -16,21 +16,16 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         bool claimed;
     }
 
-    uint256 public constant MIN_DELAY = 1 days; // minimum delay for locks
-    uint256 public constant GRACE_PERIOD = 7 days; // time after unlock for depositor reclaim
-    uint256 public constant BATCH_LIMIT = 32; // max IDs per batch claim
+    uint256 public constant MIN_DELAY = 1 days;
+    uint256 public constant GRACE_PERIOD = 7 days;
+    uint256 public constant BATCH_LIMIT = 32;
     uint256 public protocolFeeBalance;
 
     uint256 private nextLockId = 1;
 
-    // beneficiary => lockId => Lock
     mapping(address => mapping(uint256 => Lock)) public locks;
-    // beneficiary => array of lock IDs
     mapping(address => uint256[]) public lockIds;
 
-    // -------------------------------
-    // Events
-    // -------------------------------
     event LockCreated(
         address indexed depositor,
         address indexed beneficiary,
@@ -52,9 +47,6 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     );
     event FeeWithdrawn(address indexed admin, uint256 amount);
 
-    // -------------------------------
-    // Errors
-    // -------------------------------
     error ZeroAmount();
     error UnlockTooSoon();
     error InvalidLock();
@@ -66,10 +58,8 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     error BatchTooLarge();
     error FeeTransferFailed();
     error TransferFailed();
+    error InvalidRecipient();
 
-    // -------------------------------
-    // Lock Creation
-    // -------------------------------
     function createLock(
         address beneficiary,
         uint256 unlockTime
@@ -88,18 +78,9 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
 
         lockIds[beneficiary].push(lockId);
 
-        emit LockCreated(
-            msg.sender,
-            beneficiary,
-            lockId,
-            msg.value,
-            unlockTime
-        );
+        emit LockCreated(msg.sender, beneficiary, lockId, msg.value, unlockTime);
     }
 
-    // -------------------------------
-    // Single Claim
-    // -------------------------------
     function claim(
         uint256 lockId,
         address payable recipient
@@ -111,21 +92,17 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
 
         lock.claimed = true;
 
-        uint256 fee = lock.amount / 100; // 1% fee
+        uint256 fee = lock.amount / 100; // 1%
         uint256 payout = lock.amount - fee;
         protocolFeeBalance += fee;
 
         if (recipient == address(0)) recipient = payable(msg.sender);
 
-        (bool success, ) = recipient.call{value: payout}("");
-        if (!success) revert TransferFailed();
+        recipient.sendValue(payout); // replaces low-level call
 
         emit LockClaimed(msg.sender, recipient, lockId, payout, fee);
     }
 
-    // -------------------------------
-    // Batch Claim
-    // -------------------------------
     function batchClaim(
         uint256[] calldata ids,
         address payable recipient
@@ -134,7 +111,6 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         uint256 totalPayout;
         uint256 totalFee;
 
-        // First, mark all locks claimed and calculate total payout & fee
         for (uint256 i = 0; i < ids.length; i++) {
             Lock storage lock = locks[msg.sender][ids[i]];
             if (lock.amount == 0) revert InvalidLock();
@@ -151,8 +127,7 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         protocolFeeBalance += totalFee;
         if (recipient == address(0)) recipient = payable(msg.sender);
 
-        (bool success, ) = recipient.call{value: totalPayout}("");
-        if (!success) revert TransferFailed();
+        recipient.sendValue(totalPayout); // replaces low-level call
 
         for (uint256 i = 0; i < ids.length; i++) {
             emit LockClaimed(
@@ -160,16 +135,12 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
                 recipient,
                 ids[i],
                 locks[msg.sender][ids[i]].amount -
-                    locks[msg.sender][ids[i]].amount /
-                    100,
+                    locks[msg.sender][ids[i]].amount / 100,
                 locks[msg.sender][ids[i]].amount / 100
             );
         }
     }
 
-    // -------------------------------
-    // Reclaim
-    // -------------------------------
     function reclaim(
         address beneficiary,
         uint256 lockId
@@ -183,34 +154,28 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
 
         lock.claimed = true;
 
-        uint256 fee = lock.amount / 100; // 1% fee
+        uint256 fee = lock.amount / 100;
         uint256 payout = lock.amount - fee;
         protocolFeeBalance += fee;
 
-        (bool success, ) = payable(msg.sender).call{value: payout}("");
-        if (!success) revert TransferFailed();
+        payable(msg.sender).sendValue(payout); // replaces low-level call
 
         emit LockReclaimed(msg.sender, lockId, payout);
     }
 
-    // -------------------------------
-    // Fee Withdrawal
-    // -------------------------------
     function withdrawFees(
         address payable recipient
     ) external onlyOwner nonReentrant whenNotPaused {
+        if (recipient == address(0)) revert InvalidRecipient();
+
         uint256 amount = protocolFeeBalance;
         protocolFeeBalance = 0;
 
-        (bool success, ) = recipient.call{value: amount}("");
-        if (!success) revert FeeTransferFailed();
+        recipient.sendValue(amount); // replaces low-level call
 
         emit FeeWithdrawn(msg.sender, amount);
     }
 
-    // -------------------------------
-    // Pause / Unpause
-    // -------------------------------
     function pause() external onlyOwner {
         _pause();
     }
@@ -219,9 +184,6 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         _unpause();
     }
 
-    // -------------------------------
-    // View Functions
-    // -------------------------------
     function getLockIds(
         address beneficiary
     ) external view returns (uint256[] memory) {
@@ -235,7 +197,6 @@ contract TimeLockedWallet is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         return locks[beneficiary][lockId];
     }
 
-    // Reject direct ETH transfers
     receive() external payable {
         revert("Use createLock");
     }
