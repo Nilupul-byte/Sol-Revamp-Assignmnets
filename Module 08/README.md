@@ -16,9 +16,19 @@ This Foundry script deploys the **GameEconomyV1** and **GameEconomyV2** smart co
 - `ALCHEMY_KEY`: Your Alchemy API key for the target network.
 
 ## Usage
-
+**To Deploy**
 ```bash
 forge script script/Deploy.s.sol \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/$ALCHEMY_KEY \
   --private-key $PRIVATE_KEY \
   --broadcast
+```
+
+**To Withdraw**
+
+````bash
+cast send 0xb46C902975288b2d026da25DAb7522798CF64e2e \
+  "withdraw(address,uint256)" 0x3F336336ed5c201a65b981E6CbF89820CbDeCaFc 890000000000000000 \
+  --private-key $PRIVATE_KEY \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --gas-limit 200000
