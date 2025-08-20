@@ -19,7 +19,7 @@ contract Deploy is Script {
 
         // Configuration
         string memory baseURI = "https://api.gameeconomy.io/metadata/{id}.json";
-        uint256 currencyPricePerUnit = 0.000001 ether; // 0.001 ETH per currency unit
+        uint256 currencyPricePerUnit = 0.00001 ether; // 0.001 ETH per currency unit
         uint256[] memory initialMaterials = new uint256[](3);
         initialMaterials[0] = 1; // Wood
         initialMaterials[1] = 2; // Stone  
@@ -58,7 +58,7 @@ contract Deploy is Script {
         
         // Buy currency
         console.log("Buying 150 currency units...");
-        gameEconomy.buyCurrency{value: 0.0008 ether}(8000);
+        gameEconomy.buyCurrency{value: 0.008 ether}(800);
         console.log("Currency balance:", gameEconomy.balanceOf(deployer, 0));
 
         // Set a recipe (Wood: 5, Stone: 3, Iron: 1)
@@ -115,7 +115,7 @@ contract Deploy is Script {
         console.log("Testing V2 batch purchase...");
         
         // Buy more currency first
-        gameEconomyV2.buyCurrency{value: 0.1 ether}(100);
+        gameEconomyV2.buyCurrency{value: 0.001 ether}(100);
         
         // Test batch purchase
         uint256[] memory batchIds = new uint256[](3);
