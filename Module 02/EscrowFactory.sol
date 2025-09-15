@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./SimpleEscrow.sol";
 
-contract EscrowFactory is Ownable, Pausable, ReentrancyGuard {
+contract EscrowFactory is Ownable2Step, Pausable, ReentrancyGuard {
     // F-1: Immutable fee percentage (1%)
     uint256 public immutable feePercent = 1;
     // F-1: Fee recipient address
